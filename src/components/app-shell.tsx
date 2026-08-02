@@ -6,15 +6,18 @@ import { Sidebar } from "@/components/sidebar";
 import { CommandMenu, type SearchDoc } from "@/components/command-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import type { CategoryStat } from "@/lib/aggregate.server";
 
 export function AppShell({
   categoryStats,
   searchDocs,
+  userEmail,
   children,
 }: {
   categoryStats: CategoryStat[];
   searchDocs: SearchDoc[];
+  userEmail: string;
   children: React.ReactNode;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -24,12 +27,17 @@ export function AppShell({
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
       <div className="flex min-h-svh w-full">
         <div className="hidden md:flex">
-          <Sidebar categoryStats={categoryStats} onOpenSearch={() => setSearchOpen(true)} />
+          <Sidebar
+            categoryStats={categoryStats}
+            userEmail={userEmail}
+            onOpenSearch={() => setSearchOpen(true)}
+          />
         </div>
 
         <SheetContent side="left" className="w-72 p-0">
           <Sidebar
             categoryStats={categoryStats}
+            userEmail={userEmail}
             onOpenSearch={() => {
               setMobileOpen(false);
               setSearchOpen(true);
@@ -42,7 +50,10 @@ export function AppShell({
             <SheetTrigger render={<Button variant="ghost" size="icon" />}>
               <Menu className="size-5" />
             </SheetTrigger>
-            <span className="font-semibold">Prep/OS</span>
+            <span className="flex items-center gap-2 font-semibold">
+              <Logo size={22} />
+              PrepForge
+            </span>
             <Button
               variant="ghost"
               size="icon"

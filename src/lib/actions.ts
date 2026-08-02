@@ -7,14 +7,20 @@ import * as notes from "./notes.server";
 import * as interviews from "./interviews.server";
 import * as designs from "./designs.server";
 import * as mockInterview from "./mock-interview.server";
+import { requireUserId } from "./auth.server";
 import type { TopicStatus } from "./types";
 import type { InterviewLogInput } from "./interviews.server";
 import type { FlashcardRating } from "./progress.server";
 import type { Node, Edge } from "reactflow";
 import type { MockAttemptInput } from "./mock-interview.server";
 
+// Every action derives the current user's id from the (server-verified)
+// session cookie via requireUserId() — never accept a userId as an argument
+// from the client, or any caller could mutate another user's data.
+
 export async function setStatusAction(topicId: string, status: TopicStatus) {
-  const entry = await progress.setStatus(topicId, status);
+  const userId = await requireUserId();
+  const entry = await progress.setStatus(userId, topicId, status);
   revalidatePath(`/topics/${topicId}`);
   revalidatePath("/roadmap");
   revalidatePath("/");
@@ -22,14 +28,16 @@ export async function setStatusAction(topicId: string, status: TopicStatus) {
 }
 
 export async function setConfidenceAction(topicId: string, confidence: number) {
-  const entry = await progress.setConfidence(topicId, confidence);
+  const userId = await requireUserId();
+  const entry = await progress.setConfidence(userId, topicId, confidence);
   revalidatePath(`/topics/${topicId}`);
   revalidatePath("/");
   return entry;
 }
 
 export async function toggleChecklistAction(topicId: string, index: number) {
-  const entry = await progress.toggleChecklistItem(topicId, index);
+  const userId = await requireUserId();
+  const entry = await progress.toggleChecklistItem(userId, topicId, index);
   revalidatePath(`/topics/${topicId}`);
   revalidatePath("/roadmap");
   revalidatePath("/");
@@ -37,42 +45,49 @@ export async function toggleChecklistAction(topicId: string, index: number) {
 }
 
 export async function saveNoteAction(slug: string, title: string, body: string) {
-  await notes.saveNote(slug, title, body);
+  const userId = await requireUserId();
+  await notes.saveNote(userId, slug, title, body);
   revalidatePath("/notes");
   revalidatePath(`/notes/${slug}`);
 }
 
 export async function createNoteAction(title: string) {
-  const slug = await notes.createNote(title);
+  const userId = await requireUserId();
+  const slug = await notes.createNote(userId, title);
   revalidatePath("/notes");
   return slug;
 }
 
 export async function deleteNoteAction(slug: string) {
-  await notes.deleteNote(slug);
+  const userId = await requireUserId();
+  await notes.deleteNote(userId, slug);
   revalidatePath("/notes");
 }
 
 export async function createInterviewLogAction(input: InterviewLogInput) {
-  const id = await interviews.createInterviewLog(input);
+  const userId = await requireUserId();
+  const id = await interviews.createInterviewLog(userId, input);
   revalidatePath("/interviews");
   redirect(`/interviews/${id}`);
 }
 
-export async function updateInterviewLogAction(id: number, input: InterviewLogInput) {
-  await interviews.updateInterviewLog(id, input);
+export async function updateInterviewLogAction(id: string, input: InterviewLogInput) {
+  const userId = await requireUserId();
+  await interviews.updateInterviewLog(userId, id, input);
   revalidatePath("/interviews");
   revalidatePath(`/interviews/${id}`);
 }
 
-export async function deleteInterviewLogAction(id: number) {
-  await interviews.deleteInterviewLog(id);
+export async function deleteInterviewLogAction(id: string) {
+  const userId = await requireUserId();
+  await interviews.deleteInterviewLog(userId, id);
   revalidatePath("/interviews");
   redirect("/interviews");
 }
 
 export async function rateFlashcardAction(topicId: string, rating: FlashcardRating) {
-  const entry = await progress.rateFlashcard(topicId, rating);
+  const userId = await requireUserId();
+  const entry = await progress.rateFlashcard(userId, topicId, rating);
   revalidatePath("/today");
   revalidatePath("/");
   revalidatePath(`/topics/${topicId}`);
@@ -80,34 +95,39 @@ export async function rateFlashcardAction(topicId: string, rating: FlashcardRati
 }
 
 export async function createDesignAction(title: string) {
-  const id = await designs.createDesign(title);
+  const userId = await requireUserId();
+  const id = await designs.createDesign(userId, title);
   revalidatePath("/workspace");
   redirect(`/workspace/${id}`);
 }
 
-export async function saveDesignAction(id: number, title: string, nodes: Node[], edges: Edge[]) {
-  await designs.saveDesign(id, title, nodes, edges);
+export async function saveDesignAction(id: string, title: string, nodes: Node[], edges: Edge[]) {
+  const userId = await requireUserId();
+  await designs.saveDesign(userId, id, title, nodes, edges);
   revalidatePath("/workspace");
   revalidatePath(`/workspace/${id}`);
 }
 
 export async function saveDesignVersionAction(
-  designId: number,
+  designId: string,
   label: string,
   nodes: Node[],
   edges: Edge[],
 ) {
-  await designs.saveVersion(designId, label, nodes, edges);
+  const userId = await requireUserId();
+  await designs.saveVersion(userId, designId, label, nodes, edges);
   revalidatePath(`/workspace/${designId}`);
 }
 
-export async function deleteDesignAction(id: number) {
-  await designs.deleteDesign(id);
+export async function deleteDesignAction(id: string) {
+  const userId = await requireUserId();
+  await designs.deleteDesign(userId, id);
   revalidatePath("/workspace");
   redirect("/workspace");
 }
 
 export async function saveMockAttemptAction(input: MockAttemptInput) {
-  await mockInterview.saveMockAttempt(input);
+  const userId = await requireUserId();
+  await mockInterview.saveMockAttempt(userId, input);
   revalidatePath("/mock-interview");
 }

@@ -55,7 +55,7 @@ export type InterviewType =
 export type InterviewOutcome = "pending" | "passed" | "rejected" | "no_response" | "withdrew";
 
 export interface InterviewLog {
-  id: number;
+  id: string;
   company: string;
   role: string;
   round: string;

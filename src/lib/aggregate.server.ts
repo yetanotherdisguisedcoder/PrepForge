@@ -18,9 +18,9 @@ const EMPTY_ENTRY: ProgressEntry = {
   checkedItems: [],
 };
 
-export async function getTopicsWithProgress(): Promise<TopicWithProgress[]> {
+export async function getTopicsWithProgress(userId: string): Promise<TopicWithProgress[]> {
   const topics = getAllTopics();
-  const progressMap = await readProgress();
+  const progressMap = await readProgress(userId);
   return topics.map((t) => {
     const progress = progressMap[t.id] ?? EMPTY_ENTRY;
     const percent =
@@ -44,8 +44,8 @@ export interface CategoryStat {
   avgConfidence: number;
 }
 
-export async function getCategoryStats(): Promise<CategoryStat[]> {
-  const topics = await getTopicsWithProgress();
+export async function getCategoryStats(userId: string): Promise<CategoryStat[]> {
+  const topics = await getTopicsWithProgress(userId);
   const byCategory = new Map<string, TopicWithProgress[]>();
   for (const t of topics) {
     if (!byCategory.has(t.category)) byCategory.set(t.category, []);
@@ -100,8 +100,8 @@ export interface OverallStats {
   heatmap: { date: string; count: number }[];
 }
 
-export async function getOverallStats(): Promise<OverallStats> {
-  const topics = await getTopicsWithProgress();
+export async function getOverallStats(userId: string): Promise<OverallStats> {
+  const topics = await getTopicsWithProgress(userId);
   const totalChecklistItems = topics.reduce((s, t) => s + Math.max(t.checklistTotal, 1), 0);
   const doneChecklistItems = topics.reduce(
     (s, t) =>
@@ -140,7 +140,7 @@ export async function getOverallStats(): Promise<OverallStats> {
 
   const heatmapStart = new Date();
   heatmapStart.setDate(heatmapStart.getDate() - 83); // ~12 weeks
-  const activity = await readActivitySince(heatmapStart.toISOString().slice(0, 10));
+  const activity = await readActivitySince(userId, heatmapStart.toISOString().slice(0, 10));
   const heatmap: { date: string; count: number }[] = [];
   const d = new Date(heatmapStart);
   for (let i = 0; i < 84; i++) {
@@ -155,7 +155,7 @@ export async function getOverallStats(): Promise<OverallStats> {
     doneChecklistItems,
     percent:
       totalChecklistItems > 0 ? Math.round((doneChecklistItems / totalChecklistItems) * 100) : 0,
-    streak: await currentStreak(),
+    streak: await currentStreak(userId),
     notStarted: topics.filter((t) => t.progress.status === "not-started").length,
     learning: topics.filter((t) => t.progress.status === "learning").length,
     needsRevision: topics.filter((t) => t.progress.status === "needs-revision").length,
@@ -177,8 +177,10 @@ export interface CategoryGroupWithProgress {
   topics: TopicWithProgress[];
 }
 
-export async function getCategoryGroupsWithProgress(): Promise<CategoryGroupWithProgress[]> {
-  const topics = await getTopicsWithProgress();
+export async function getCategoryGroupsWithProgress(
+  userId: string,
+): Promise<CategoryGroupWithProgress[]> {
+  const topics = await getTopicsWithProgress(userId);
   const byCategory = new Map<string, TopicWithProgress[]>();
   for (const t of topics) {
     if (!byCategory.has(t.category)) byCategory.set(t.category, []);
@@ -270,8 +272,8 @@ const READINESS_DIMENSIONS: { key: string; label: string; categories: string[] }
   { key: "projects", label: "Project Discussion", categories: ["resume"] },
 ];
 
-export async function getReadinessScores(): Promise<ReadinessScores> {
-  const topics = await getTopicsWithProgress();
+export async function getReadinessScores(userId: string): Promise<ReadinessScores> {
+  const topics = await getTopicsWithProgress(userId);
 
   const dimensions: ReadinessDimension[] = READINESS_DIMENSIONS.map((d) => {
     const scoped = topics.filter((t) => d.categories.includes(t.category));

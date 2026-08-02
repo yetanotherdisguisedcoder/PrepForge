@@ -8,7 +8,7 @@ function toDateStr(d: Date | string | null): string | null {
 }
 
 function rowToLog(row: {
-  id: number;
+  id: string;
   company: string;
   role: string;
   round: string;
@@ -37,15 +37,22 @@ function rowToLog(row: {
   };
 }
 
-export async function listInterviewLogs(): Promise<InterviewLog[]> {
+export async function listInterviewLogs(userId: string): Promise<InterviewLog[]> {
   const { rows } = await pool.query(
-    "select * from interview_logs order by interview_date desc nulls last, created_at desc",
+    "select * from interview_logs where user_id = $1 order by interview_date desc nulls last, created_at desc",
+    [userId],
   );
   return rows.map(rowToLog);
 }
 
-export async function getInterviewLog(id: number): Promise<InterviewLog | null> {
-  const { rows } = await pool.query("select * from interview_logs where id = $1", [id]);
+// Every single-record lookup below filters by user_id AND id — never id alone.
+// Without that, an authenticated user could read/edit/delete another user's
+// row just by guessing its id (IDOR).
+export async function getInterviewLog(userId: string, id: string): Promise<InterviewLog | null> {
+  const { rows } = await pool.query(
+    "select * from interview_logs where user_id = $1 and id = $2",
+    [userId, id],
+  );
   return rows.length > 0 ? rowToLog(rows[0]) : null;
 }
 
@@ -61,13 +68,17 @@ export interface InterviewLogInput {
   notes: string;
 }
 
-export async function createInterviewLog(input: InterviewLogInput): Promise<number> {
+export async function createInterviewLog(
+  userId: string,
+  input: InterviewLogInput,
+): Promise<string> {
   const { rows } = await pool.query(
     `insert into interview_logs
-       (company, role, round, interview_date, interview_type, outcome, rating, questions, notes)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       (user_id, company, role, round, interview_date, interview_type, outcome, rating, questions, notes)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      returning id`,
     [
+      userId,
       input.company,
       input.role,
       input.round,
@@ -82,13 +93,18 @@ export async function createInterviewLog(input: InterviewLogInput): Promise<numb
   return rows[0].id;
 }
 
-export async function updateInterviewLog(id: number, input: InterviewLogInput): Promise<void> {
+export async function updateInterviewLog(
+  userId: string,
+  id: string,
+  input: InterviewLogInput,
+): Promise<void> {
   await pool.query(
     `update interview_logs set
-       company = $2, role = $3, round = $4, interview_date = $5, interview_type = $6,
-       outcome = $7, rating = $8, questions = $9, notes = $10, updated_at = now()
-     where id = $1`,
+       company = $3, role = $4, round = $5, interview_date = $6, interview_type = $7,
+       outcome = $8, rating = $9, questions = $10, notes = $11, updated_at = now()
+     where user_id = $1 and id = $2`,
     [
+      userId,
       id,
       input.company,
       input.role,
@@ -103,8 +119,8 @@ export async function updateInterviewLog(id: number, input: InterviewLogInput): 
   );
 }
 
-export async function deleteInterviewLog(id: number): Promise<void> {
-  await pool.query("delete from interview_logs where id = $1", [id]);
+export async function deleteInterviewLog(userId: string, id: string): Promise<void> {
+  await pool.query("delete from interview_logs where user_id = $1 and id = $2", [userId, id]);
 }
 
 export interface InterviewStats {
@@ -113,8 +129,8 @@ export interface InterviewStats {
   byCompany: { company: string; count: number }[];
 }
 
-export async function getInterviewStats(): Promise<InterviewStats> {
-  const logs = await listInterviewLogs();
+export async function getInterviewStats(userId: string): Promise<InterviewStats> {
+  const logs = await listInterviewLogs(userId);
   const byOutcome: Record<InterviewOutcome, number> = {
     pending: 0,
     passed: 0,

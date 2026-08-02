@@ -15,18 +15,23 @@ import {
   GitBranch,
   Boxes,
   Mic,
+  LogOut,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
+import { signOutAction } from "@/lib/auth-actions";
 import type { CategoryStat } from "@/lib/aggregate.server";
 
 export function Sidebar({
   categoryStats,
+  userEmail,
   onOpenSearch,
 }: {
   categoryStats: CategoryStat[];
+  userEmail: string;
   onOpenSearch: () => void;
 }) {
   const pathname = usePathname();
@@ -50,8 +55,9 @@ export function Sidebar({
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground h-full md:h-svh md:sticky md:top-0">
       <div className="p-4 flex items-center justify-between">
-        <Link href="/" className="font-semibold tracking-tight text-lg">
-          Prep<span className="text-muted-foreground">/</span>OS
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-lg">
+          <Logo size={26} />
+          PrepForge
         </Link>
         <Button
           variant="ghost"
@@ -123,6 +129,20 @@ export function Sidebar({
             })}
         </div>
       </ScrollArea>
+
+      <form
+        action={signOutAction}
+        className="flex items-center gap-2 border-t px-4 py-3 shrink-0"
+      >
+        <span className="flex-1 min-w-0 truncate text-xs text-muted-foreground">{userEmail}</span>
+        <button
+          type="submit"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        >
+          <LogOut className="size-3.5" />
+          Sign out
+        </button>
+      </form>
     </aside>
   );
 }

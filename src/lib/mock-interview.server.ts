@@ -45,8 +45,8 @@ const TOPIC_PROMPT_CATEGORIES = [
   "dsa", "design_patterns", "frontend", "extras", "resume",
 ];
 
-export async function getMockQuestionPool(count = 40): Promise<MockQuestion[]> {
-  const topics = await getTopicsWithProgress();
+export async function getMockQuestionPool(userId: string, count = 40): Promise<MockQuestion[]> {
+  const topics = await getTopicsWithProgress(userId);
   const today = new Date().toISOString().slice(0, 10);
   const candidates: (MockQuestion & { weight: number })[] = [];
 
@@ -120,12 +120,13 @@ export interface MockAttemptInput {
   missingConcepts: string[];
 }
 
-export async function saveMockAttempt(input: MockAttemptInput): Promise<void> {
+export async function saveMockAttempt(userId: string, input: MockAttemptInput): Promise<void> {
   await pool.query(
     `insert into mock_interview_attempts
-       (topic_id, question, transcript, duration_seconds, score, matched_concepts, missing_concepts)
-     values ($1, $2, $3, $4, $5, $6, $7)`,
+       (user_id, topic_id, question, transcript, duration_seconds, score, matched_concepts, missing_concepts)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
+      userId,
       input.topicId,
       input.question,
       input.transcript,
@@ -138,17 +139,20 @@ export async function saveMockAttempt(input: MockAttemptInput): Promise<void> {
 }
 
 export interface MockAttemptHistoryItem {
-  id: number;
+  id: string;
   question: string;
   score: number;
   durationSeconds: number;
   createdAt: string;
 }
 
-export async function listRecentMockAttempts(limit = 10): Promise<MockAttemptHistoryItem[]> {
+export async function listRecentMockAttempts(
+  userId: string,
+  limit = 10,
+): Promise<MockAttemptHistoryItem[]> {
   const { rows } = await pool.query(
-    "select id, question, score, duration_seconds, created_at from mock_interview_attempts order by created_at desc limit $1",
-    [limit],
+    "select id, question, score, duration_seconds, created_at from mock_interview_attempts where user_id = $1 order by created_at desc limit $2",
+    [userId, limit],
   );
   return rows.map((r) => ({
     id: r.id,

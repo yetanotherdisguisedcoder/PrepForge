@@ -64,8 +64,8 @@ export function getFrequentlyForgotten(topics: TopicWithProgress[]): TopicWithPr
     .slice(0, 8);
 }
 
-export async function getFrequentlyForgottenTopics(): Promise<TopicWithProgress[]> {
-  const topics = await getTopicsWithProgress();
+export async function getFrequentlyForgottenTopics(userId: string): Promise<TopicWithProgress[]> {
+  const topics = await getTopicsWithProgress(userId);
   return getFrequentlyForgotten(topics);
 }
 

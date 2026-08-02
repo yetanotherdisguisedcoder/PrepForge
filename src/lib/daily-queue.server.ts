@@ -105,8 +105,8 @@ function extractCliCandidates(
   return out;
 }
 
-export async function getDailyQueue(): Promise<DailyQueue> {
-  const topics = await getTopicsWithProgress();
+export async function getDailyQueue(userId: string): Promise<DailyQueue> {
+  const topics = await getTopicsWithProgress(userId);
   const today = new Date().toISOString().slice(0, 10);
   const weights = new Map(topics.map((t) => [t.id, computeTopicWeight(t, today)]));
 

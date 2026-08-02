@@ -37,17 +37,17 @@ const EMPTY_ENTRY: ProgressEntry = {
   checkedItems: [],
 };
 
-export async function readProgress(): Promise<ProgressMap> {
-  const { rows } = await pool.query("select * from topic_progress");
+export async function readProgress(userId: string): Promise<ProgressMap> {
+  const { rows } = await pool.query("select * from topic_progress where user_id = $1", [userId]);
   const map: ProgressMap = {};
   for (const row of rows) map[row.topic_id] = rowToEntry(row);
   return map;
 }
 
-export async function getEntry(topicId: string): Promise<ProgressEntry> {
+export async function getEntry(userId: string, topicId: string): Promise<ProgressEntry> {
   const { rows } = await pool.query(
-    "select * from topic_progress where topic_id = $1",
-    [topicId],
+    "select * from topic_progress where user_id = $1 and topic_id = $2",
+    [userId, topicId],
   );
   return rows.length > 0 ? rowToEntry(rows[0]) : EMPTY_ENTRY;
 }
@@ -62,21 +62,21 @@ function nextReviewDate(reviewCount: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function bumpActivity() {
+async function bumpActivity(userId: string) {
   const today = new Date().toISOString().slice(0, 10);
   await pool.query(
-    `insert into activity_log (day, events) values ($1, 1)
-     on conflict (day) do update set events = activity_log.events + 1`,
-    [today],
+    `insert into activity_log (user_id, day, events) values ($1, $2, 1)
+     on conflict (user_id, day) do update set events = activity_log.events + 1`,
+    [userId, today],
   );
 }
 
-async function upsertEntry(topicId: string, entry: ProgressEntry) {
+async function upsertEntry(userId: string, topicId: string, entry: ProgressEntry) {
   await pool.query(
     `insert into topic_progress
-       (topic_id, status, confidence, review_count, last_reviewed, next_review, quiz_score, checked_items)
-     values ($1, $2, $3, $4, $5, $6, $7, $8)
-     on conflict (topic_id) do update set
+       (user_id, topic_id, status, confidence, review_count, last_reviewed, next_review, quiz_score, checked_items)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     on conflict (user_id, topic_id) do update set
        status = excluded.status,
        confidence = excluded.confidence,
        review_count = excluded.review_count,
@@ -85,6 +85,7 @@ async function upsertEntry(topicId: string, entry: ProgressEntry) {
        quiz_score = excluded.quiz_score,
        checked_items = excluded.checked_items`,
     [
+      userId,
       topicId,
       entry.status,
       entry.confidence,
@@ -97,8 +98,12 @@ async function upsertEntry(topicId: string, entry: ProgressEntry) {
   );
 }
 
-export async function setStatus(topicId: string, status: TopicStatus): Promise<ProgressEntry> {
-  const prev = await getEntry(topicId);
+export async function setStatus(
+  userId: string,
+  topicId: string,
+  status: TopicStatus,
+): Promise<ProgressEntry> {
+  const prev = await getEntry(userId, topicId);
   const today = new Date().toISOString().slice(0, 10);
   const reviewCount =
     status === "mastered" || status === "expert" ? prev.reviewCount + 1 : prev.reviewCount;
@@ -109,16 +114,20 @@ export async function setStatus(topicId: string, status: TopicStatus): Promise<P
     reviewCount,
     nextReview: nextReviewDate(reviewCount),
   };
-  await upsertEntry(topicId, entry);
-  await bumpActivity();
+  await upsertEntry(userId, topicId, entry);
+  await bumpActivity(userId);
   return entry;
 }
 
-export async function setConfidence(topicId: string, confidence: number): Promise<ProgressEntry> {
-  const prev = await getEntry(topicId);
+export async function setConfidence(
+  userId: string,
+  topicId: string,
+  confidence: number,
+): Promise<ProgressEntry> {
+  const prev = await getEntry(userId, topicId);
   const entry: ProgressEntry = { ...prev, confidence };
-  await upsertEntry(topicId, entry);
-  await bumpActivity();
+  await upsertEntry(userId, topicId, entry);
+  await bumpActivity(userId);
   return entry;
 }
 
@@ -129,10 +138,11 @@ export type FlashcardRating = "again" | "hard" | "good" | "easy";
  * that topic more likely to resurface in tomorrow's queue, a string of good
  * recalls fades it out. */
 export async function rateFlashcard(
+  userId: string,
   topicId: string,
   rating: FlashcardRating,
 ): Promise<ProgressEntry> {
-  const prev = await getEntry(topicId);
+  const prev = await getEntry(userId, topicId);
   let confidence = prev.confidence;
   let status = prev.status;
 
@@ -167,36 +177,44 @@ export async function rateFlashcard(
     lastReviewed: today,
     nextReview: nextReviewDate(reviewCount),
   };
-  await upsertEntry(topicId, entry);
-  await bumpActivity();
+  await upsertEntry(userId, topicId, entry);
+  await bumpActivity(userId);
   return entry;
 }
 
-export async function toggleChecklistItem(topicId: string, index: number): Promise<ProgressEntry> {
-  const prev = await getEntry(topicId);
+export async function toggleChecklistItem(
+  userId: string,
+  topicId: string,
+  index: number,
+): Promise<ProgressEntry> {
+  const prev = await getEntry(userId, topicId);
   const has = prev.checkedItems.includes(index);
   const checkedItems = has
     ? prev.checkedItems.filter((i) => i !== index)
     : [...prev.checkedItems, index].sort((a, b) => a - b);
   const entry: ProgressEntry = { ...prev, checkedItems };
-  await upsertEntry(topicId, entry);
-  await bumpActivity();
+  await upsertEntry(userId, topicId, entry);
+  await bumpActivity(userId);
   return entry;
 }
 
-export async function readActivitySince(startDate: string): Promise<Record<string, number>> {
+export async function readActivitySince(
+  userId: string,
+  startDate: string,
+): Promise<Record<string, number>> {
   const { rows } = await pool.query(
-    "select day, events from activity_log where day >= $1",
-    [startDate],
+    "select day, events from activity_log where user_id = $1 and day >= $2",
+    [userId, startDate],
   );
   const map: Record<string, number> = {};
   for (const row of rows) map[toDateStr(row.day)!] = row.events;
   return map;
 }
 
-export async function currentStreak(): Promise<number> {
+export async function currentStreak(userId: string): Promise<number> {
   const { rows } = await pool.query(
-    "select day from activity_log order by day desc limit 400",
+    "select day from activity_log where user_id = $1 order by day desc limit 400",
+    [userId],
   );
   const days = new Set(rows.map((r) => toDateStr(r.day)));
   let streak = 0;

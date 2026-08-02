@@ -1,4 +1,4 @@
-# Prep/OS — Interview Preparation Platform
+# PrepForge — Interview Preparation Platform
 
 A daily-driver interview prep app: roadmap, spaced repetition, mock interviews (coming), progress
 tracking, and notes — all built on top of handbook content in [`content/resources/`](content/resources).
