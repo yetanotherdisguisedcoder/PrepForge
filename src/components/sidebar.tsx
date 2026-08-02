@@ -98,7 +98,7 @@ export function Sidebar({
       <div className="mt-4 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
         Categories
       </div>
-      <ScrollArea className="flex-1 px-2 py-2">
+      <ScrollArea className="flex-1 min-h-0 px-2 py-2">
         <div className="space-y-0.5 pb-6">
           {categoryStats
             .sort((a, b) => b.topicsCount - a.topicsCount)
